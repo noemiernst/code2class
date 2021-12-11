@@ -3,8 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class Code2Vec(nn.Module):
-    def __init__(self, nodes_dim, paths_dim, embedding_dim, output_dim, dropout, path_size):
+    def __init__(self, nodes_dim, paths_dim, embedding_dim, output_dim, dropout, path_size, hidden_dim):
         super().__init__()
+
+        self.embedding_dim = embedding_dim
+        self.hidden_dim = hidden_dim
 
         # TODO subtoken encoding?
         self.node_embedding = nn.Embedding(nodes_dim, embedding_dim)
@@ -12,7 +15,8 @@ class Code2Vec(nn.Module):
         # TODO adapt path embedding -> additional encoding of path via LSTM (add LSTM?)
         self.path_embedding = nn.Embedding(paths_dim, embedding_dim)
 
-        self.lstm = nn.LSTM(path_size, 1, batch_first=True)
+        self.lstm = nn.LSTM(path_size, hidden_dim, batch_first=True)
+        self.hidden2path = nn.Linear(hidden_dim, 1)
 
         # weights for fully connected layer -> vector compression
         self.W = nn.Parameter(torch.randn(1, embedding_dim, 3*embedding_dim))
@@ -45,12 +49,13 @@ class Code2Vec(nn.Module):
         #embedded_paths = [batch size, max length, max_path_length, embedding dim]
 
 
-        lstm_in = embedded_paths.view(len(paths)*len(paths[0]), 128, -1)
+        lstm_in = embedded_paths.view(paths.size()[0]*paths.size()[1], self.embedding_dim, -1)
         #lstm_in = [batch size * max length, embedding dim, max_path_length]
 
         lstm_out, _ = self.lstm(lstm_in)
         #lstm_out = [batch size * max length, embedding dim, 1]
-        encoded_paths = lstm_out.view(len(paths), len(paths[0]), -1)
+        encoded_path = self.hidden2path(lstm_out.view(paths.size()[0]*paths.size()[1], self.embedding_dim, -1))
+        encoded_paths = encoded_path.view(paths.size()[0], paths.size()[1], -1)
         #encoded_paths = [batch size, max length, embedding dim]
 
 

@@ -17,6 +17,7 @@ SEED = 1234
 DATA_DIR = 'data'
 DATASET = 'java-small'
 EMBEDDING_DIM = 128
+HIDDEN_DIM = 128
 DROPOUT = 0.25
 BATCH_SIZE = 128
 CHUNKS = 10
@@ -74,7 +75,7 @@ for t in target2count.keys():
 for k, v in target2idx.items():
     idx2target[v] = k
 
-model = models.Code2Vec(len(word2idx), len(path2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH)
+model = models.Code2Vec(len(word2idx), len(path2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, HIDDEN_DIM)
 
 if LOAD:
     print(f'Loading model from {MODEL_SAVE_PATH}')
