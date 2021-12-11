@@ -15,19 +15,20 @@ import models
 
 SEED = 1234
 DATA_DIR = 'data'
-DATASET = 'java14m'
+DATASET = 'java-small'
 EMBEDDING_DIM = 128
 DROPOUT = 0.25
-BATCH_SIZE = 1024
+BATCH_SIZE = 128
 CHUNKS = 10
 MAX_LENGTH = 200
+MAX_PATH_LENGTH = 10
 LOG_EVERY = 100 #print log of results after every LOG_EVERY batches
 N_EPOCHS = 50
 LOG_DIR = 'logs'
 SAVE_DIR = 'checkpoints'
 LOG_PATH = os.path.join(LOG_DIR, f'{DATASET}-log.txt')
 MODEL_SAVE_PATH = os.path.join(SAVE_DIR, f'{DATASET}-model.pt')
-LOAD = True #set true if you want to load model from MODEL_SAVE_PATH
+LOAD = False #set true if you want to load model from MODEL_SAVE_PATH
 
 # set random seeds for reproducability
 
@@ -38,7 +39,7 @@ torch.backends.cudnn.deterministic = True
 
 #load counts of each token in dataset
 
-with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2v', 'rb') as file:
+with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2s', 'rb') as file:
     word2count = pickle.load(file)
     path2count = pickle.load(file)
     target2count = pickle.load(file)
@@ -73,7 +74,7 @@ for t in target2count.keys():
 for k, v in target2idx.items():
     idx2target[v] = k
 
-model = models.Code2Vec(len(word2idx), len(path2idx), EMBEDDING_DIM, len(target2idx), DROPOUT)
+model = models.Code2Vec(len(word2idx), len(path2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH)
 
 if LOAD:
     print(f'Loading model from {MODEL_SAVE_PATH}')
@@ -83,7 +84,7 @@ optimizer = optim.Adam(model.parameters())
 
 criterion = nn.CrossEntropyLoss()
 
-device = torch.device('cuda')
+device = torch.device('cpu')
 
 model = model.to(device)
 criterion = criterion.to(device)
@@ -167,11 +168,15 @@ def file_iterator(file_path):
 
             example_length = len(example_body)
 
+            if example_length > MAX_LENGTH:
+                random.shuffle(example_body)
+                example_body = example_body[:200]
+                example_length = len(example_body)
             assert example_length <= MAX_LENGTH
             
             #need to pad all to maximum length
-
-            example_body += [['<pad>', '<pad>', '<pad>']]*(MAX_LENGTH - example_length)
+            for i in range (MAX_LENGTH - example_length):
+                example_body += [['<pad>', '<pad>', '<pad>']]
             
             assert len(example_body) == MAX_LENGTH
 
@@ -200,23 +205,34 @@ def numericalize(examples, n):
         
         tensor_n = torch.zeros(BATCH_SIZE).long() #name
         tensor_l = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #left node
-        tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #path
+        # TODO paths are lists of nodes
+        #tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #path
+        tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH, MAX_PATH_LENGTH)).long() #path
         tensor_r = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #right node
         mask = torch.ones((BATCH_SIZE, MAX_LENGTH)).float() #mask
         
         #for each example in our raw data
         
         for j, (name, body, length) in enumerate(zip(raw_batch_name, raw_batch_body, batch_lengths)):
-            
+
+            for path in body:
+                path[1] = path[1].split('|')
+                for k in range(MAX_PATH_LENGTH-len(path[1])):
+                    path[1] += ['<pad>']
+
             #convert to idxs using vocab
             #use <unk> tokens if item doesn't exist inside vocab
             temp_n = target2idx.get(name, target2idx['<unk>'])
-            temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), path2idx.get(p, path2idx['<unk>']), word2idx.get(r, word2idx['<unk>'])) for l, p, r in body])
+            temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [path2idx.get(p, path2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
             
             #store idxs inside tensors
             tensor_n[j] = temp_n
             tensor_l[j,:] = torch.LongTensor(temp_l)
-            tensor_p[j,:] = torch.LongTensor(temp_p)
+            l = 0
+            for path in temp_p:
+                tensor_p[j,l,:] = torch.LongTensor(path)
+                l+=1
+            #tensor_p[j,:] = torch.LongTensor(temp_p)
             tensor_r[j,:] = torch.LongTensor(temp_r)   
             
             #create masks
@@ -462,14 +478,14 @@ for epoch in range(N_EPOCHS):
         f.write(log+'\n')
     print(log)
     
-    train_loss, train_acc, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2v', optimizer, criterion)
+    train_loss, train_acc, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2s', optimizer, criterion)
     
     log = f'Epoch: {epoch+1:02} - Validation'
     with open(LOG_PATH, 'a+') as f:
         f.write(log+'\n')
     print(log)
     
-    valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2v', criterion)
+    valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion)
     
     if valid_loss < best_valid_loss:
         best_valid_loss = valid_loss
@@ -489,7 +505,7 @@ print(log)
 
 model.load_state_dict(torch.load(MODEL_SAVE_PATH))
 
-test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATASET}/{DATASET}/{DATASET}.test.c2v', criterion)
+test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATASET}/{DATASET}/{DATASET}.test.c2s', criterion)
 
 log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p:.3f} | Test Recall: {test_r:.3f} | Test F1: {test_f1:.3f} | Test Acc: {test_acc*100:.2f}% |'
 with open(LOG_PATH, 'a+') as f:
