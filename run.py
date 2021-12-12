@@ -507,7 +507,7 @@ print(log)
 
 model.load_state_dict(torch.load(MODEL_SAVE_PATH))
 
-test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATASET}/{DATASET}/{DATASET}.test.c2s', criterion)
+test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion)
 
 log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p:.3f} | Test Recall: {test_r:.3f} | Test F1: {test_f1:.3f} | Test Acc: {test_acc*100:.2f}% |'
 with open(LOG_PATH, 'a+') as f:
