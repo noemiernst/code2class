@@ -17,7 +17,7 @@ SEED = 1234
 DATA_DIR = 'data'
 DATASET = 'java-small'
 EMBEDDING_DIM = 128
-HIDDEN_DIM = 128
+HIDDEN_DIM = 16
 DROPOUT = 0.25
 BATCH_SIZE = 128
 CHUNKS = 10
@@ -41,19 +41,21 @@ torch.backends.cudnn.deterministic = True
 #load counts of each token in dataset
 
 with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2s', 'rb') as file:
+    # TODO Fix Preprocessing: word dictionary currently as subtokens
     word2count = pickle.load(file)
-    path2count = pickle.load(file)
+    node2count = pickle.load(file)
     target2count = pickle.load(file)
+    max_contexts = pickle.load(file)
     n_training_examples = pickle.load(file)
 
 # create vocabularies, initialized with unk and pad tokens
 
 word2idx = {'<unk>': 0, '<pad>': 1}
-path2idx = {'<unk>': 0, '<pad>': 1 }
+node2idx = {'<unk>': 0, '<pad>': 1 }
 target2idx = {'<unk>': 0, '<pad>': 1}
 
 idx2word = {}
-idx2path = {}
+idx2node = {}
 idx2target = {}
 
 
@@ -63,11 +65,11 @@ for w in word2count.keys():
 for k, v in word2idx.items():
     idx2word[v] = k
     
-for p in path2count.keys():
-    path2idx[p] = len(path2idx)
+for p in node2count.keys():
+    node2idx[p] = len(node2idx)
     
-for k, v in path2idx.items():
-    idx2path[v] = k
+for k, v in node2idx.items():
+    idx2node[v] = k
     
 for t in target2count.keys():
     target2idx[t] = len(target2idx)
@@ -75,7 +77,7 @@ for t in target2count.keys():
 for k, v in target2idx.items():
     idx2target[v] = k
 
-model = models.Code2Vec(len(word2idx), len(path2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, HIDDEN_DIM)
+model = models.Code2Vec(len(word2idx), len(node2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, HIDDEN_DIM)
 
 if LOAD:
     print(f'Loading model from {MODEL_SAVE_PATH}')
@@ -206,7 +208,6 @@ def numericalize(examples, n):
         
         tensor_n = torch.zeros(BATCH_SIZE).long() #name
         tensor_l = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #left node
-        # TODO paths are lists of nodes
         #tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #path
         tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH, MAX_PATH_LENGTH)).long() #path
         tensor_r = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #right node
@@ -224,7 +225,7 @@ def numericalize(examples, n):
             #convert to idxs using vocab
             #use <unk> tokens if item doesn't exist inside vocab
             temp_n = target2idx.get(name, target2idx['<unk>'])
-            temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [path2idx.get(p, path2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
+            temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [node2idx.get(p, node2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
             
             #store idxs inside tensors
             tensor_n[j] = temp_n
