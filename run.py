@@ -1,5 +1,7 @@
 #import functionality
 
+from comet_ml import Experiment
+
 import torch
 import torch.optim as optim
 import torch.nn as nn
@@ -11,20 +13,36 @@ import pickle
 
 import models
 
+hyper_params = {
+    "data": 'data',
+    "data_dir": 'mixed_slt_opt',
+    "embedding_dim": 128,
+    "hidden_dim": 16,
+    "dropout": 0.25,
+    "batch_size": 128,
+    "chunks": 10,
+    "max_length": 200,
+    "max_path_length": 10,
+    "n_epochs": 15
+}
+experiment = Experiment(project_name="mathclassificationc2c")
+experiment.log_parameters(hyper_params)
+
+
 # setup parameters
 
 SEED = 1234
-DATA_DIR = 'data'
-DATASET = 'java-small'
-EMBEDDING_DIM = 128
-HIDDEN_DIM = 16
-DROPOUT = 0.25
-BATCH_SIZE = 128
-CHUNKS = 10
-MAX_LENGTH = 200
-MAX_PATH_LENGTH = 10
+DATA_DIR = hyper_params["data"]
+DATASET = hyper_params["data_dir"]
+EMBEDDING_DIM = hyper_params["embedding_dim"]
+HIDDEN_DIM = hyper_params["hidden_dim"]
+DROPOUT = hyper_params["dropout"]
+BATCH_SIZE = hyper_params["batch_size"]
+CHUNKS = hyper_params["chunks"]
+MAX_LENGTH = hyper_params["max_length"]
+MAX_PATH_LENGTH = hyper_params["max_path_length"]
 LOG_EVERY = 100 #print log of results after every LOG_EVERY batches
-N_EPOCHS = 50
+N_EPOCHS = hyper_params["n_epochs"]
 LOG_DIR = 'logs'
 SAVE_DIR = 'checkpoints'
 LOG_PATH = os.path.join(LOG_DIR, f'{DATASET}-log.txt')
@@ -277,19 +295,18 @@ def train(model, file_path, optimizer, criterion):
     Once we near end of file, may have less than BATCH_SIZE * CHUNKS examples left, but still want to use
     So we calculate number of remaining whole batches (len(examples)//BATCH_SIZE) then do that many updates
     """
-    
     n_batches = 0
-    
+
     epoch_loss = 0
     epoch_acc = 0
     epoch_r = 0
     epoch_p = 0
     epoch_f1 = 0
-    
+
     model.train()
-    
+
     examples = []
-    
+
     for example_name, example_body, example_length in file_iterator(file_path):
 
         examples.append((example_name, example_body, example_length))
@@ -315,11 +332,11 @@ def train(model, file_path, optimizer, criterion):
                 epoch_p += p
                 epoch_r += r
                 epoch_f1 += f1
-                
+
                 n_batches += 1
-                                    
+
                 if n_batches % LOG_EVERY == 0:
-            
+
                     loss = epoch_loss / n_batches
                     acc = epoch_acc / n_batches
                     precision = epoch_p / n_batches
@@ -333,10 +350,10 @@ def train(model, file_path, optimizer, criterion):
                     print(log)
 
             examples = []
-                            
+
         else:
             pass
-      
+
     #outside of `file_iterator`, but will probably still have some examples left over
     random.shuffle(examples)
 
@@ -345,16 +362,16 @@ def train(model, file_path, optimizer, criterion):
 
     #train with remaining batches
     for tensor_n, tensor_l, tensor_p, tensor_r, mask in numericalize(examples, n):
-            
+
         #place on gpu
 
         tensor_n = tensor_n.to(device)
         tensor_l = tensor_l.to(device)
         tensor_p = tensor_p.to(device)
         tensor_r = tensor_r.to(device)
-            
+
         #put into model
-                
+
         loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimizer)
 
         epoch_loss += loss
@@ -362,7 +379,7 @@ def train(model, file_path, optimizer, criterion):
         epoch_p += p
         epoch_r += r
         epoch_f1 += f1
-        
+
         n_batches += 1
 
     return epoch_loss / n_batches, epoch_acc / n_batches, epoch_p / n_batches, epoch_r / n_batches, epoch_f1 / n_batches
@@ -473,43 +490,64 @@ if not os.path.isdir(f'{LOG_DIR}'):
 if os.path.exists(LOG_PATH):
     os.remove(LOG_PATH)
 
-for epoch in range(N_EPOCHS):
 
-    log = f'Epoch: {epoch+1:02} - Training'
+with experiment.train():
+    for epoch in range(N_EPOCHS):
+
+        log = f'Epoch: {epoch+1:02} - Training'
+        with open(LOG_PATH, 'a+') as f:
+
+            f.write(log+'\n')
+        print(log)
+
+        train_loss, train_acc, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2s', optimizer, criterion)
+        experiment.log_metric("loss", train_loss, step=epoch)
+        experiment.log_metric("accuracy", train_acc, step=epoch)
+        experiment.log_metric("precision", train_p, step=epoch)
+        experiment.log_metric("recall", train_r, step=epoch)
+        experiment.log_metric("f1", train_f1, step=epoch)
+
+        log = f'Epoch: {epoch+1:02} - Validation'
+        with open(LOG_PATH, 'a+') as f:
+            f.write(log+'\n')
+        print(log)
+
+        valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion)
+        experiment.log_metric("validation_loss", valid_loss, step=epoch)
+        experiment.log_metric("validation_acc", valid_acc, step=epoch)
+        experiment.log_metric("validation_p", valid_p, step=epoch)
+        experiment.log_metric("validation_r", valid_r, step=epoch)
+        experiment.log_metric("validation_f1", valid_f1, step=epoch)
+
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            torch.save(model.state_dict(), MODEL_SAVE_PATH)
+
+        log = f'| Epoch: {epoch+1:02} |\n'
+        log += f'| Train Loss: {train_loss:.3f} | Train Precision: {train_p:.3f} | Train Recall: {train_r:.3f} | Train F1: {train_f1:.3f} | Train Acc: {train_acc*100:.2f}% |\n'
+        log += f'| Val. Loss: {valid_loss:.3f} | Val. Precision: {valid_p:.3f} | Val. Recall: {valid_r:.3f} | Val. F1: {valid_f1:.3f} | Val. Acc: {valid_acc*100:.2f}% |'
+        with open(LOG_PATH, 'a+') as f:
+            f.write(log+'\n')
+        print(log)
+
+
+with experiment.test():
+    log = 'Testing'
     with open(LOG_PATH, 'a+') as f:
         f.write(log+'\n')
     print(log)
-    
-    train_loss, train_acc, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2s', optimizer, criterion)
-    
-    log = f'Epoch: {epoch+1:02} - Validation'
-    with open(LOG_PATH, 'a+') as f:
-        f.write(log+'\n')
-    print(log)
-    
-    valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion)
-    
-    if valid_loss < best_valid_loss:
-        best_valid_loss = valid_loss
-        torch.save(model.state_dict(), MODEL_SAVE_PATH)
-    
-    log = f'| Epoch: {epoch+1:02} |\n'
-    log += f'| Train Loss: {train_loss:.3f} | Train Precision: {train_p:.3f} | Train Recall: {train_r:.3f} | Train F1: {train_f1:.3f} | Train Acc: {train_acc*100:.2f}% |\n'
-    log += f'| Val. Loss: {valid_loss:.3f} | Val. Precision: {valid_p:.3f} | Val. Recall: {valid_r:.3f} | Val. F1: {valid_f1:.3f} | Val. Acc: {valid_acc*100:.2f}% |'
+
+    model.load_state_dict(torch.load(MODEL_SAVE_PATH))
+
+    test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion)
+    experiment.log_metric("loss", valid_loss, step=N_EPOCHS)
+    experiment.log_metric("accuracy", valid_acc, step=N_EPOCHS)
+    experiment.log_metric("precision", valid_p, step=N_EPOCHS)
+    experiment.log_metric("recall", valid_r, step=N_EPOCHS)
+    experiment.log_metric("f1", valid_f1, step=N_EPOCHS)
+
+    log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p:.3f} | Test Recall: {test_r:.3f} | Test F1: {test_f1:.3f} | Test Acc: {test_acc*100:.2f}% |'
     with open(LOG_PATH, 'a+') as f:
         f.write(log+'\n')
     print(log)
 
-log = 'Testing'
-with open(LOG_PATH, 'a+') as f:
-    f.write(log+'\n')
-print(log)
-
-model.load_state_dict(torch.load(MODEL_SAVE_PATH))
-
-test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion)
-
-log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p:.3f} | Test Recall: {test_r:.3f} | Test F1: {test_f1:.3f} | Test Acc: {test_acc*100:.2f}% |'
-with open(LOG_PATH, 'a+') as f:
-    f.write(log+'\n')
-print(log)
