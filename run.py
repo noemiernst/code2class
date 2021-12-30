@@ -32,8 +32,8 @@ experiment.log_parameters(hyper_params)
 # setup parameters
 
 SEED = 1234
-DATA_DIR = hyper_params["data"]
-DATASET = hyper_params["data_dir"]
+DATA_DIR = hyper_params["data_dir"]
+DATASET = hyper_params["data"]
 EMBEDDING_DIM = hyper_params["embedding_dim"]
 HIDDEN_DIM = hyper_params["hidden_dim"]
 DROPOUT = hyper_params["dropout"]
