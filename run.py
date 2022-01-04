@@ -23,7 +23,8 @@ hyper_params = {
     "chunks": 10,
     "max_length": 200,
     "max_path_length": 10,
-    "n_epochs": 15
+    "n_epochs": 15,
+    "metrics_at_k": 1
 }
 experiment = Experiment(project_name="mathclassificationc2c")
 experiment.log_parameters(hyper_params)
@@ -164,6 +165,48 @@ def calculate_f1(fx, y):
         precision, recall, f1 = 0, 0, 0
     return precision, recall, f1
 
+def calculate_f1_at_k(fx, y, k):
+    """
+    Calculate precision, recall and F1 score
+    - Takes top-1 predictions
+    - Converts to strings
+    - Splits into sub-tokens
+    - Calculates TP, FP and FN
+    - Calculates precision, recall and F1 score
+
+    fx = [batch size, output dim]
+     y = [batch size]
+    """
+    pred_idxs = fx.topk(k)[1]
+    pred_names = [[idx2target[i.item()] for i in preds] for preds in pred_idxs]
+    #original_names = [idx2target[i.item()] for i in y]
+    original_names = []
+    for i in range(len(y)):
+        original_names.append([])
+    for i, ex in enumerate(y.tolist()):
+        for j, v in enumerate(ex):
+            if v == 1:
+                original_names[i].append(idx2target[j])
+    true_positive, false_positive, false_negative = 0, 0, 0
+    for p, o in zip(pred_names, original_names):
+        predicted_subtokens = p #.split('|')
+        original_subtokens = o #.split('|')
+        for subtok in predicted_subtokens:
+            if subtok in original_subtokens:
+                true_positive += 1
+            else:
+                false_positive += 1
+        for subtok in original_subtokens:
+            if not subtok in predicted_subtokens:
+                false_negative += 1
+    try:
+        precision = true_positive / (true_positive + false_positive)
+        recall = true_positive / (true_positive + false_negative)
+        f1 = 2 * precision * recall / (precision + recall)
+    except ZeroDivisionError:
+        precision, recall, f1 = 0, 0, 0
+    return precision, recall, f1
+
 def parse_line(line):
     """
     Takes a string 'x y1,p1,z1 y2,p2,z2 ... yn,pn,zn and splits into name (x) and tree [[y1,p1,z1], ...]
@@ -272,7 +315,7 @@ def numericalize(examples, n):
 
         yield tensor_n, tensor_l, tensor_p, tensor_r, mask
 
-def get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimizer=None):
+def get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, k, optimizer=None):
     """
     Takes inputs, calculates loss, accuracy and other metrics, then calculates gradients and updates parameters
 
@@ -287,7 +330,8 @@ def get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimi
     loss = criterion(fx, tensor_n)
 
     #acc = calculate_accuracy(fx, tensor_n)
-    precision, recall, f1 = calculate_f1(fx, tensor_n)
+    #precision, recall, f1 = calculate_f1(fx, tensor_n)
+    precision, recall, f1 = calculate_f1_at_k(fx, tensor_n, k)
     
     if optimizer is not None:
         loss.backward()
@@ -338,7 +382,7 @@ def train(model, file_path, optimizer, criterion):
                 tensor_r = tensor_r.to(device)
 
                 #put into model
-                loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimizer)
+                loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, hyper_params["metrics_at_k"], optimizer)
 
                 epoch_loss += loss
                 epoch_acc += acc
@@ -385,7 +429,7 @@ def train(model, file_path, optimizer, criterion):
 
         #put into model
 
-        loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimizer)
+        loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, hyper_params["metrics_at_k"], optimizer)
 
         epoch_loss += loss
         epoch_acc += acc
@@ -397,7 +441,7 @@ def train(model, file_path, optimizer, criterion):
 
     return epoch_loss / n_batches, epoch_acc / n_batches, epoch_p / n_batches, epoch_r / n_batches, epoch_f1 / n_batches
 
-def evaluate(model, file_path, criterion):
+def evaluate(model, file_path, criterion, k):
     """
     Similar to training loop, but we do not pass optimizer to get_metrics
     Also wrap get_metrics in `torch.no_grad` to avoid calculating gradients
@@ -434,7 +478,7 @@ def evaluate(model, file_path, criterion):
 
                 #put into model
                 with torch.no_grad():
-                    loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion)
+                    loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, k)
 
                 epoch_loss += loss
                 #epoch_acc += acc
@@ -480,7 +524,7 @@ def evaluate(model, file_path, criterion):
             
         #put into model
         with torch.no_grad():
-            loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion)
+            loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, k)
 
         epoch_loss += loss
         #epoch_acc += acc
@@ -525,12 +569,27 @@ with experiment.train():
             f.write(log+'\n')
         print(log)
 
-        valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion)
+        valid_loss, valid_acc, valid_p_1, valid_r_1, valid_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 1)
         experiment.log_metric("validation_loss", valid_loss, step=epoch)
         #experiment.log_metric("validation_acc", valid_acc, step=epoch)
-        experiment.log_metric("validation_p", valid_p, step=epoch)
-        experiment.log_metric("validation_r", valid_r, step=epoch)
-        experiment.log_metric("validation_f1", valid_f1, step=epoch)
+        experiment.log_metric("validation_p_at1", valid_p_1, step=epoch)
+        experiment.log_metric("validation_r_at1", valid_r_1, step=epoch)
+        experiment.log_metric("validation_f1_at1", valid_f1_1, step=epoch)
+
+        valid_loss, valid_acc, valid_p_3, valid_r_3, valid_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 3)
+        experiment.log_metric("validation_loss", valid_loss, step=epoch)
+        #experiment.log_metric("validation_acc", valid_acc, step=epoch)
+        experiment.log_metric("validation_p_at3", valid_p_3, step=epoch)
+        experiment.log_metric("validation_r_at3", valid_r_3, step=epoch)
+        experiment.log_metric("validation_f1_at3", valid_f1_3, step=epoch)
+
+        valid_loss, valid_acc, valid_p_5, valid_r_5, valid_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 5)
+        experiment.log_metric("validation_loss", valid_loss, step=epoch)
+        #experiment.log_metric("validation_acc", valid_acc, step=epoch)
+        experiment.log_metric("validation_p_at5", valid_p_5, step=epoch)
+        experiment.log_metric("validation_r_at5", valid_r_5, step=epoch)
+        experiment.log_metric("validation_f1_at5", valid_f1_5, step=epoch)
+
 
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
@@ -538,7 +597,7 @@ with experiment.train():
 
         log = f'| Epoch: {epoch+1:02} |\n'
         log += f'| Train Loss: {train_loss:.3f} | Train Precision: {train_p:.3f} | Train Recall: {train_r:.3f} | Train F1: {train_f1:.3f} | Train Acc: {train_acc*100:.2f}% |\n'
-        log += f'| Val. Loss: {valid_loss:.3f} | Val. Precision: {valid_p:.3f} | Val. Recall: {valid_r:.3f} | Val. F1: {valid_f1:.3f} | Val. Acc: {valid_acc*100:.2f}% |'
+        log += f'| Val. Loss: {valid_loss:.3f} | Val. Precision: {valid_p_1:.3f} | Val. Recall: {valid_r_1:.3f} | Val. F1: {valid_f1_1:.3f} | Val. Acc: {valid_acc*100:.2f}% |'
         with open(LOG_PATH, 'a+') as f:
             f.write(log+'\n')
         print(log)
@@ -552,14 +611,28 @@ with experiment.test():
 
     model.load_state_dict(torch.load(MODEL_SAVE_PATH))
 
-    test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion)
+    test_loss, test_acc, test_p_1, test_r_1, test_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 1)
     experiment.log_metric("loss", test_loss, step=N_EPOCHS)
     #experiment.log_metric("accuracy", test_acc, step=N_EPOCHS)
-    experiment.log_metric("precision", test_p, step=N_EPOCHS)
-    experiment.log_metric("recall", test_r, step=N_EPOCHS)
-    experiment.log_metric("f1", test_f1, step=N_EPOCHS)
+    experiment.log_metric("precision_at1", test_p_1, step=N_EPOCHS)
+    experiment.log_metric("recall_at1", test_r_1, step=N_EPOCHS)
+    experiment.log_metric("f1_at1", test_f1_1, step=N_EPOCHS)
 
-    log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p:.3f} | Test Recall: {test_r:.3f} | Test F1: {test_f1:.3f} | Test Acc: {test_acc*100:.2f}% |'
+    test_loss, test_acc, test_p_3, test_r_3, test_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 3)
+    experiment.log_metric("loss", test_loss, step=N_EPOCHS)
+    #experiment.log_metric("accuracy", test_acc, step=N_EPOCHS)
+    experiment.log_metric("precision_at3", test_p_3, step=N_EPOCHS)
+    experiment.log_metric("recall_at3", test_r_3, step=N_EPOCHS)
+    experiment.log_metric("f1_at3", test_f1_3, step=N_EPOCHS)
+
+    test_loss, test_acc, test_p_5, test_r_5, test_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 5)
+    experiment.log_metric("loss", test_loss, step=N_EPOCHS)
+    #experiment.log_metric("accuracy", test_acc, step=N_EPOCHS)
+    experiment.log_metric("precision_at5", test_p_5, step=N_EPOCHS)
+    experiment.log_metric("recall_at5", test_r_5, step=N_EPOCHS)
+    experiment.log_metric("f1_at5", test_f1_5, step=N_EPOCHS)
+
+    log = f'| Test Loss: {test_loss:.3f} | Test Precision: {test_p_1:.3f} | Test Recall: {test_r_1:.3f} | Test F1: {test_f1_1:.3f} | Test Acc: {test_acc*100:.2f}% |'
     with open(LOG_PATH, 'a+') as f:
         f.write(log+'\n')
     print(log)
