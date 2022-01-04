@@ -103,7 +103,7 @@ if LOAD:
 
 optimizer = optim.Adam(model.parameters())
 
-criterion = nn.CrossEntropyLoss()
+criterion = nn.MultiLabelSoftMarginLoss() #nn.CrossEntropyLoss()
 
 device = torch.device('cpu')
 
@@ -136,11 +136,18 @@ def calculate_f1(fx, y):
     """
     pred_idxs = fx.max(1, keepdim=True)[1]
     pred_names = [idx2target[i.item()] for i in pred_idxs]
-    original_names = [idx2target[i.item()] for i in y]
+    #original_names = [idx2target[i.item()] for i in y]
+    original_names = []
+    for i in range(len(y)):
+        original_names.append([])
+    for i, ex in enumerate(y.tolist()):
+        for j, v in enumerate(ex):
+            if v == 1:
+                original_names[i].append(idx2target[j])
     true_positive, false_positive, false_negative = 0, 0, 0
     for p, o in zip(pred_names, original_names):
         predicted_subtokens = p.split('|')
-        original_subtokens = o.split('|')
+        original_subtokens = o #.split('|')
         for subtok in predicted_subtokens:
             if subtok in original_subtokens:
                 true_positive += 1
@@ -224,7 +231,7 @@ def numericalize(examples, n):
         
         #create a tensor to store the batch
         
-        tensor_n = torch.zeros(BATCH_SIZE).long() #name
+        tensor_n = torch.zeros((BATCH_SIZE, len(target2idx))).long() #name
         tensor_l = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #left node
         #tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH)).long() #path
         tensor_p = torch.zeros((BATCH_SIZE, MAX_LENGTH, MAX_PATH_LENGTH)).long() #path
@@ -233,20 +240,25 @@ def numericalize(examples, n):
         
         #for each example in our raw data
         
-        for j, (name, body, length) in enumerate(zip(raw_batch_name, raw_batch_body, batch_lengths)):
+        for j, (names, body, length) in enumerate(zip(raw_batch_name, raw_batch_body, batch_lengths)):
 
             for path in body:
                 path[1] = path[1].split('|')
                 for k in range(MAX_PATH_LENGTH-len(path[1])):
                     path[1] += ['<pad>']
 
+            names = names.split('|')
+
             #convert to idxs using vocab
             #use <unk> tokens if item doesn't exist inside vocab
-            temp_n = target2idx.get(name, target2idx['<unk>'])
+            temp_names = [target2idx.get(name, target2idx['<unk>']) for name in names]
+            temp_n = [0]*52
+            for idx in temp_names:
+                temp_n[idx] = 1
             temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [node2idx.get(p, node2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
             
             #store idxs inside tensors
-            tensor_n[j] = temp_n
+            tensor_n[j,:] = torch.LongTensor(temp_n)
             tensor_l[j,:] = torch.LongTensor(temp_l)
             l = 0
             for path in temp_p:
@@ -274,14 +286,15 @@ def get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, optimi
 
     loss = criterion(fx, tensor_n)
 
-    acc = calculate_accuracy(fx, tensor_n)
+    #acc = calculate_accuracy(fx, tensor_n)
     precision, recall, f1 = calculate_f1(fx, tensor_n)
     
     if optimizer is not None:
         loss.backward()
         optimizer.step()    
 
-    return loss.item(), acc.item(), precision, recall, f1
+    #return loss.item(), acc.item(), precision, recall, f1
+    return loss.item(), 0, precision, recall, f1
 
 def train(model, file_path, optimizer, criterion):
     """
@@ -424,7 +437,7 @@ def evaluate(model, file_path, criterion):
                     loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion)
 
                 epoch_loss += loss
-                epoch_acc += acc
+                #epoch_acc += acc
                 epoch_p += p
                 epoch_r += r
                 epoch_f1 += f1
@@ -434,7 +447,7 @@ def evaluate(model, file_path, criterion):
                 if n_batches % LOG_EVERY == 0:
             
                     loss = epoch_loss / n_batches
-                    acc = epoch_acc / n_batches
+                    #acc = epoch_acc / n_batches
                     precision = epoch_p / n_batches
                     recall = epoch_r / n_batches
                     f1 = epoch_f1 / n_batches
@@ -470,7 +483,7 @@ def evaluate(model, file_path, criterion):
             loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion)
 
         epoch_loss += loss
-        epoch_acc += acc
+        #epoch_acc += acc
         epoch_p += p
         epoch_r += r
         epoch_f1 += f1
@@ -502,7 +515,7 @@ with experiment.train():
 
         train_loss, train_acc, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2s', optimizer, criterion)
         experiment.log_metric("loss", train_loss, step=epoch)
-        experiment.log_metric("accuracy", train_acc, step=epoch)
+        #experiment.log_metric("accuracy", train_acc, step=epoch)
         experiment.log_metric("precision", train_p, step=epoch)
         experiment.log_metric("recall", train_r, step=epoch)
         experiment.log_metric("f1", train_f1, step=epoch)
@@ -514,7 +527,7 @@ with experiment.train():
 
         valid_loss, valid_acc, valid_p, valid_r, valid_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion)
         experiment.log_metric("validation_loss", valid_loss, step=epoch)
-        experiment.log_metric("validation_acc", valid_acc, step=epoch)
+        #experiment.log_metric("validation_acc", valid_acc, step=epoch)
         experiment.log_metric("validation_p", valid_p, step=epoch)
         experiment.log_metric("validation_r", valid_r, step=epoch)
         experiment.log_metric("validation_f1", valid_f1, step=epoch)
@@ -541,7 +554,7 @@ with experiment.test():
 
     test_loss, test_acc, test_p, test_r, test_f1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion)
     experiment.log_metric("loss", test_loss, step=N_EPOCHS)
-    experiment.log_metric("accuracy", test_acc, step=N_EPOCHS)
+    #experiment.log_metric("accuracy", test_acc, step=N_EPOCHS)
     experiment.log_metric("precision", test_p, step=N_EPOCHS)
     experiment.log_metric("recall", test_r, step=N_EPOCHS)
     experiment.log_metric("f1", test_f1, step=N_EPOCHS)
