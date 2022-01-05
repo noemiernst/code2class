@@ -19,7 +19,7 @@ hyper_params = {
     # <data_dir>/<data>/<data>.test.c2s
     # <data_dir>/<data>/<data>.val.c2s
     # <data_dir>/<data>/<data>.dict.c2s
-    "data": 'mixed_slt_opt_multiclass',
+    "dataset_name": 'dataset_name',
     "data_dir": 'data',
     # load: load saved checkpoint/model? (True to load from save: <save_dir>/<data>-model.pt)
     "load": False,
@@ -51,7 +51,7 @@ experiment.log_parameters(hyper_params)
 
 SEED = 1234
 DATA_DIR = hyper_params["data_dir"]
-DATASET = hyper_params["data"]
+DATASET = hyper_params["dataset_name"]
 EMBEDDING_DIM = hyper_params["embedding_dim"]
 LSTM_DIM = hyper_params["lstm_dim"]
 DROPOUT = hyper_params["dropout"]
@@ -77,11 +77,9 @@ torch.backends.cudnn.deterministic = True
 #load counts of each token in dataset
 
 with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2s', 'rb') as file:
-    # TODO Fix Preprocessing: word dictionary currently as subtokens
     word2count = pickle.load(file)
     node2count = pickle.load(file)
     target2count = pickle.load(file)
-    max_contexts = pickle.load(file)
     n_training_examples = pickle.load(file)
 
 # create vocabularies, initialized with unk and pad tokens
@@ -123,7 +121,7 @@ optimizer = optim.Adam(model.parameters())
 
 criterion = nn.MultiLabelSoftMarginLoss() #nn.CrossEntropyLoss()
 
-device = torch.device('cpu')
+device = torch.device('cuda')
 
 model = model.to(device)
 criterion = criterion.to(device)
