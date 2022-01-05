@@ -2,6 +2,8 @@
 
 This repo contains an implementation of [code2vec: Learning Distributed Representations of Code](https://arxiv.org/abs/1803.09473). 
 
+<center style="padding: 40px"><img width="70%" src="c2c_network.png" /></center>
+
 ## Requirements
 
 - Python 3+
