@@ -109,3 +109,5 @@ data/
 logs/
 models/
 checkpoints/
+/data_preprocessed/
+/java-small-preprocessed.tar.gz
