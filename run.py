@@ -21,6 +21,12 @@ hyper_params = {
     # <data_dir>/<data>/<data>.dict.c2s
     "data": 'mixed_slt_opt_multiclass',
     "data_dir": 'data',
+    # load: load saved checkpoint/model? (True to load from save: <save_dir>/<data>-model.pt)
+    "load": False,
+    # save_dir: model location (<save_dir>/<data>-model.pt)
+    "save_dir": 'checkpoints',
+    # log_dir: log location (<log_dir>/<data>-log.txt)
+    "log_dir": 'logs',
     # embedding dim: size of fully connected layer (vector compression)
     "embedding_dim": 128,
     # lstm dim: hidden dim of lstm
@@ -55,11 +61,11 @@ MAX_LENGTH = hyper_params["max_length"]
 MAX_PATH_LENGTH = hyper_params["max_path_length"]
 LOG_EVERY = 100 #print log of results after every LOG_EVERY batches
 N_EPOCHS = hyper_params["n_epochs"]
-LOG_DIR = 'logs'
-SAVE_DIR = 'checkpoints'
+LOG_DIR = hyper_params["log_dir"]
+SAVE_DIR = hyper_params["save_dir"]
 LOG_PATH = os.path.join(LOG_DIR, f'{DATASET}-log.txt')
 MODEL_SAVE_PATH = os.path.join(SAVE_DIR, f'{DATASET}-model.pt')
-LOAD = False #set true if you want to load model from MODEL_SAVE_PATH
+LOAD = hyper_params["load"]
 
 # set random seeds for reproducability
 
