@@ -18,12 +18,13 @@ It uses an LSTM path encoding from code2seq and softmax label classification.
 
 ## Quickstart
 
-1. `./download_preprocessed.sh` to get the pre-processed datasets from the code2seq paper.
-  - Note: by default the 1 datasets from code2seq are commented out.
-2. `python run.py`
+1. `./download_preprocess.sh` to get the datasets from the code2seq paper.
+2. `./preprocess.sh` to create necessary dictionary and format data.
+3. `python run.py`
 
 ## Data
 
+### Context/Example Format
 We have a training, testing and validation file, where:
   * Each row is an example.
   * Each example is a space-delimited list of fields, where:
@@ -48,4 +49,10 @@ One row in a file could look like:
 `target1|target2 token1,path|that|leads|to,token2 token3,another|path,token2`
 
 
+### Files
+The examples are split up into 3 files:
+- `<data_dir>/<data>/<data>.train.c2s`
+- `<data_dir>/<data>/<data>.test.c2s`
+- `<data_dir>/<data>/<data>.val.c2s`
 
+A dictionary (`<data_dir>/<data>/<data>.dict.c2s`)is also required. This will be created by running `./preprocess.sh`
