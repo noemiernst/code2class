@@ -105,7 +105,7 @@ optimizer = optim.Adam(model.parameters())
 
 criterion = nn.CrossEntropyLoss()
 
-device = torch.device('cpu')
+device = torch.device('cuda')
 
 model = model.to(device)
 criterion = criterion.to(device)
