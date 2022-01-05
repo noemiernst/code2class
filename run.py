@@ -14,7 +14,7 @@ import pickle
 import models
 
 hyper_params = {
-    "data": 'data',
+    "dataset_name": 'dataset_name',
     "data_dir": 'mixed_slt_opt',
     "embedding_dim": 128,
     "hidden_dim": 16,
@@ -33,7 +33,7 @@ experiment.log_parameters(hyper_params)
 
 SEED = 1234
 DATA_DIR = hyper_params["data_dir"]
-DATASET = hyper_params["data"]
+DATASET = hyper_params["dataset_name"]
 EMBEDDING_DIM = hyper_params["embedding_dim"]
 HIDDEN_DIM = hyper_params["hidden_dim"]
 DROPOUT = hyper_params["dropout"]
@@ -59,11 +59,9 @@ torch.backends.cudnn.deterministic = True
 #load counts of each token in dataset
 
 with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2s', 'rb') as file:
-    # TODO Fix Preprocessing: word dictionary currently as subtokens
     word2count = pickle.load(file)
     node2count = pickle.load(file)
     target2count = pickle.load(file)
-    max_contexts = pickle.load(file)
     n_training_examples = pickle.load(file)
 
 # create vocabularies, initialized with unk and pad tokens
