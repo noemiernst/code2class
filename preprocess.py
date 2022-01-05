@@ -46,7 +46,7 @@ def process_file(file_path, data_file_role, dataset_name, max_contexts):
                 total += 1
                 outfile.write(target_name + ' ' + " ".join(contexts) + csv_padding + '\n')
 
-    print('File: ' + file_path)
+    print('File: ' + output_path)
     print('Average total contexts: ' + str(float(sum_total) / total))
     print('Average final (after sampling) contexts: ' + str(float(sum_sampled) / total))
     print('Total examples: ' + str(total))
@@ -84,12 +84,12 @@ if __name__ == '__main__':
                         help="path to validation data file", required=True)
     parser.add_argument("-mc", "--max_contexts", dest="max_contexts", default=200,
                         help="number of max contexts to keep in test+validation", required=False)
-    parser.add_argument("-svs", "--subtoken_vocab_size", dest="subtoken_vocab_size", default=186277,
-                        help="Max number of source subtokens to keep in the vocabulary", required=False)
+    parser.add_argument("-svs", "--token_vocab_size", dest="token_vocab_size", default=186277,
+                        help="Max number of source tokens to keep in the vocabulary", required=False)
     parser.add_argument("-tvs", "--target_vocab_size", dest="target_vocab_size", default=26347,
                         help="Max number of target words to keep in the vocabulary", required=False)
-    parser.add_argument("-sh", "--subtoken_histogram", dest="subtoken_histogram",
-                        help="subtoken histogram file", metavar="FILE", required=True)
+    parser.add_argument("-sh", "--token_histogram", dest="token_histogram",
+                        help="token histogram file", metavar="FILE", required=True)
     parser.add_argument("-nh", "--node_histogram", dest="node_histogram",
                         help="node_histogram file", metavar="FILE", required=True)
     parser.add_argument("-th", "--target_histogram", dest="target_histogram",

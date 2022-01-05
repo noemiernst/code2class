@@ -2,10 +2,11 @@
 
 ###########################################################
 RAW_DATA_DIR=data             # where the un-preprocessed data files are
-DATA_DIR=data_preprocessed    # where the preprocessed data files are written to (can overwrite raw data if =RAW_DATA_DIR!)
+DATA_DIR=data_preprocessed    # where the preprocessed data files are written to
+                              # (value must be different thant RAW_DATA_DIR!)
 DATASET_NAME=java-small       # name of dataset
 MAX_CONTEXTS=200              # max data contexts to use in training
-TOKEN_VOCAB_SIZE=186277       # the number of subtokens and target words to keep ..
+TOKEN_VOCAB_SIZE=186277       # the number of tokens and target words to keep ..
 TARGET_VOCAB_SIZE=26347       # .. in the vocabulary (the top occurring words and paths will be kept).
 PYTHON=python3
 ###########################################################
@@ -28,6 +29,7 @@ cat ${TRAIN_DATA_FILE} | cut -d' ' -f2- | tr ' ' '\n' | cut -d',' -f2 | tr '|' '
 
 echo "Running Preprocess.py (Creating Dictionary and format files)"
 ${PYTHON} preprocess.py --train_data ${TRAIN_DATA_FILE} --test_data ${TEST_DATA_FILE} --val_data ${VAL_DATA_FILE} \
-  --max_contexts ${MAX_CONTEXTS} --subtoken_vocab_size ${TOKEN_VOCAB_SIZE} \
-  --target_vocab_size ${TARGET_VOCAB_SIZE} --subtoken_histogram ${SOURCE_TOKEN_HISTOGRAM} \
-  --node_histogram ${NODE_HISTOGRAM_FILE} --target_histogram ${TARGET_HISTOGRAM_FILE} --output_name data/${DATASET_NAME}/${DATASET_NAME}
+  --max_contexts ${MAX_CONTEXTS} --token_vocab_size ${TOKEN_VOCAB_SIZE} \
+  --target_vocab_size ${TARGET_VOCAB_SIZE} --token_histogram ${SOURCE_TOKEN_HISTOGRAM} \
+  --node_histogram ${NODE_HISTOGRAM_FILE} --target_histogram ${TARGET_HISTOGRAM_FILE} \
+  --output_name ${DATA_DIR}/${DATASET_NAME}/${DATASET_NAME}
