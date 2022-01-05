@@ -14,19 +14,30 @@ import pickle
 import models
 
 hyper_params = {
-    "data": 'data',
-    "data_dir": 'mixed_slt_opt',
+    # data format:
+    # <data_dir>/<data>/<data>.train.c2s
+    # <data_dir>/<data>/<data>.test.c2s
+    # <data_dir>/<data>/<data>.val.c2s
+    # <data_dir>/<data>/<data>.dict.c2s
+    "data": 'mixed_slt_opt_multiclass',
+    "data_dir": 'data',
+    # embedding dim: size of fully connected layer (vector compression)
     "embedding_dim": 128,
-    "hidden_dim": 16,
+    # lstm dim: hidden dim of lstm
+    "lstm_dim": 16,
+    # dropout: dropout rate for prevention of coadaption of neurons
     "dropout": 0.25,
+    # batch_size, chunks: training/evaluation uses batch_size*chunks examples at a time
     "batch_size": 128,
     "chunks": 10,
+    # max_length: max number of paths in examples
     "max_length": 200,
+    # max_path_length: max path segments in paths
     "max_path_length": 10,
+    # n_epochs: number of epochs to train
     "n_epochs": 15,
-    "metrics_at_k": 1
 }
-experiment = Experiment(project_name="mathclassificationc2c")
+experiment = Experiment(project_name="mathclassificationc2c-debug-multiclass-atk")
 experiment.log_parameters(hyper_params)
 
 
@@ -36,7 +47,7 @@ SEED = 1234
 DATA_DIR = hyper_params["data_dir"]
 DATASET = hyper_params["data"]
 EMBEDDING_DIM = hyper_params["embedding_dim"]
-HIDDEN_DIM = hyper_params["hidden_dim"]
+LSTM_DIM = hyper_params["lstm_dim"]
 DROPOUT = hyper_params["dropout"]
 BATCH_SIZE = hyper_params["batch_size"]
 CHUNKS = hyper_params["chunks"]
@@ -96,7 +107,7 @@ for t in target2count.keys():
 for k, v in target2idx.items():
     idx2target[v] = k
 
-model = models.Code2Vec(len(word2idx), len(node2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, HIDDEN_DIM)
+model = models.Code2Vec(len(word2idx), len(node2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, LSTM_DIM)
 
 if LOAD:
     print(f'Loading model from {MODEL_SAVE_PATH}')
@@ -123,63 +134,22 @@ def calculate_accuracy(fx, y):
     acc = correct.float()/pred_idxs.shape[0]
     return acc
 
-def calculate_f1(fx, y):
-    """
-    Calculate precision, recall and F1 score
-    - Takes top-1 predictions
-    - Converts to strings
-    - Splits into sub-tokens
-    - Calculates TP, FP and FN
-    - Calculates precision, recall and F1 score
-
-    fx = [batch size, output dim]
-     y = [batch size]
-    """
-    pred_idxs = fx.max(1, keepdim=True)[1]
-    pred_names = [idx2target[i.item()] for i in pred_idxs]
-    #original_names = [idx2target[i.item()] for i in y]
-    original_names = []
-    for i in range(len(y)):
-        original_names.append([])
-    for i, ex in enumerate(y.tolist()):
-        for j, v in enumerate(ex):
-            if v == 1:
-                original_names[i].append(idx2target[j])
-    true_positive, false_positive, false_negative = 0, 0, 0
-    for p, o in zip(pred_names, original_names):
-        predicted_subtokens = p.split('|')
-        original_subtokens = o #.split('|')
-        for subtok in predicted_subtokens:
-            if subtok in original_subtokens:
-                true_positive += 1
-            else:
-                false_positive += 1
-        for subtok in original_subtokens:
-            if not subtok in predicted_subtokens:
-                false_negative += 1
-    try:
-        precision = true_positive / (true_positive + false_positive)
-        recall = true_positive / (true_positive + false_negative)
-        f1 = 2 * precision * recall / (precision + recall)
-    except ZeroDivisionError:
-        precision, recall, f1 = 0, 0, 0
-    return precision, recall, f1
-
 def calculate_f1_at_k(fx, y, k):
     """
     Calculate precision, recall and F1 score
-    - Takes top-1 predictions
+    - Takes top-k predictions
     - Converts to strings
-    - Splits into sub-tokens
     - Calculates TP, FP and FN
     - Calculates precision, recall and F1 score
 
     fx = [batch size, output dim]
      y = [batch size]
     """
+    # take top k predictions
     pred_idxs = fx.topk(k)[1]
+    # convert to strings
     pred_names = [[idx2target[i.item()] for i in preds] for preds in pred_idxs]
-    #original_names = [idx2target[i.item()] for i in y]
+    # take true values
     original_names = []
     for i in range(len(y)):
         original_names.append([])
@@ -187,10 +157,11 @@ def calculate_f1_at_k(fx, y, k):
         for j, v in enumerate(ex):
             if v == 1:
                 original_names[i].append(idx2target[j])
+    # calculate TP, FP and FN
     true_positive, false_positive, false_negative = 0, 0, 0
     for p, o in zip(pred_names, original_names):
-        predicted_subtokens = p #.split('|')
-        original_subtokens = o #.split('|')
+        predicted_subtokens = p
+        original_subtokens = o
         for subtok in predicted_subtokens:
             if subtok in original_subtokens:
                 true_positive += 1
@@ -200,6 +171,7 @@ def calculate_f1_at_k(fx, y, k):
             if not subtok in predicted_subtokens:
                 false_negative += 1
     try:
+        # calculates precision, recall and F1 score
         precision = true_positive / (true_positive + false_positive)
         recall = true_positive / (true_positive + false_negative)
         f1 = 2 * precision * recall / (precision + recall)
@@ -295,7 +267,7 @@ def numericalize(examples, n):
             #convert to idxs using vocab
             #use <unk> tokens if item doesn't exist inside vocab
             temp_names = [target2idx.get(name, target2idx['<unk>']) for name in names]
-            temp_n = [0]*52
+            temp_n = [0]*len(target2idx)
             for idx in temp_names:
                 temp_n[idx] = 1
             temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [node2idx.get(p, node2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
@@ -330,7 +302,6 @@ def get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, k, opt
     loss = criterion(fx, tensor_n)
 
     #acc = calculate_accuracy(fx, tensor_n)
-    #precision, recall, f1 = calculate_f1(fx, tensor_n)
     precision, recall, f1 = calculate_f1_at_k(fx, tensor_n, k)
     
     if optimizer is not None:
@@ -382,7 +353,7 @@ def train(model, file_path, optimizer, criterion):
                 tensor_r = tensor_r.to(device)
 
                 #put into model
-                loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, hyper_params["metrics_at_k"], optimizer)
+                loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, 1, optimizer)
 
                 epoch_loss += loss
                 epoch_acc += acc
@@ -429,7 +400,7 @@ def train(model, file_path, optimizer, criterion):
 
         #put into model
 
-        loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, hyper_params["metrics_at_k"], optimizer)
+        loss, acc, p, r, f1 = get_metrics(tensor_n, tensor_l, tensor_p, tensor_r, model, criterion, 1, optimizer)
 
         epoch_loss += loss
         epoch_acc += acc
