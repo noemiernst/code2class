@@ -32,6 +32,7 @@ def process_file(file_path, data_file_role, dataset_name, max_contexts):
                 parts = line.rstrip('\n').split(' ')
                 target_name = parts[0]
                 contexts = parts[1:]
+                contexts = [i for i in contexts if i != '']
 
                 if len(contexts) > max_unfiltered:
                     max_unfiltered = len(contexts)
