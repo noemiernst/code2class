@@ -261,6 +261,7 @@ def numericalize(examples, n):
         
         for j, (names, body, length) in enumerate(zip(raw_batch_name, raw_batch_body, batch_lengths)):
 
+            # pad paths to MAX PATH LENGTH
             for path in body:
                 path[1] = path[1].split('|')
                 for k in range(MAX_PATH_LENGTH-len(path[1])):
@@ -275,6 +276,8 @@ def numericalize(examples, n):
             for idx in temp_names:
                 temp_n[idx] = 1
             temp_l, temp_p, temp_r = zip(*[(word2idx.get(l, word2idx['<unk>']), [node2idx.get(p, node2idx['<unk>']) for p in path], word2idx.get(r, word2idx['<unk>'])) for l, path, r in body])
+            # cut off paths at MAX PATH LENGTH
+            temp_p = [path[:MAX_PATH_LENGTH] for path in temp_p]
             
             #store idxs inside tensors
             tensor_n[j,:] = torch.LongTensor(temp_n)

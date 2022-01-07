@@ -18,6 +18,11 @@ def save_dictionaries(dataset_name, token_to_count, node_to_count, target_to_cou
         pickle.dump(num_examples, file)
         print('Dictionaries saved to: {}'.format(save_dict_file_path))
 
+def valid_path(path):
+    parts = path.split(",")
+    if len(parts) != 3:
+        return ""
+    return path
 
 def process_file(file_path, data_file_role, dataset_name, max_contexts):
     sum_total = 0
@@ -32,6 +37,7 @@ def process_file(file_path, data_file_role, dataset_name, max_contexts):
                 parts = line.rstrip('\n').split(' ')
                 target_name = parts[0]
                 contexts = parts[1:]
+                contexts = [valid_path(i) for i in contexts]
                 contexts = [i for i in contexts if i != '']
 
                 if len(contexts) > max_unfiltered:
