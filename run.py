@@ -112,7 +112,7 @@ for t in target2count.keys():
 for k, v in target2idx.items():
     idx2target[v] = k
 
-model = models.Code2Vec(len(word2idx), len(node2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, LSTM_DIM, BATCH_SIZE, MAX_LENGTH)
+model = models.Code2Class(len(word2idx), len(node2idx), EMBEDDING_DIM, len(target2idx), DROPOUT, MAX_PATH_LENGTH, LSTM_DIM, BATCH_SIZE, MAX_LENGTH)
 
 if LOAD:
     print(f'Loading model from {MODEL_SAVE_PATH}')

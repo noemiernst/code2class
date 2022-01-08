@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-class Code2Vec(nn.Module):
+class Code2Class(nn.Module):
     def __init__(self, nodes_dim, paths_dim, embedding_dim, output_dim, dropout, path_size, hidden_dim, batch_size, nb_paths):
         super().__init__()
 
