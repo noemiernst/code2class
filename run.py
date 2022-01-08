@@ -17,12 +17,12 @@ import models
 experiment = Experiment(project_name="project_name")
 hyper_params = {
     # data format:
-    # <data_dir>/<data>/<data>.train.c2s
-    # <data_dir>/<data>/<data>.test.c2s
-    # <data_dir>/<data>/<data>.val.c2s
-    # <data_dir>/<data>/<data>.dict.c2s
-    "dataset_name": 'dataset_name',
-    "data_dir": 'data',
+    # <data_dir>/<data>/<data>.train.c2c
+    # <data_dir>/<data>/<data>.test.c2c
+    # <data_dir>/<data>/<data>.val.c2c
+    # <data_dir>/<data>/<data>.dict.c2c
+    "dataset_name": 'mixed_slt_opt_multiclass',
+    "data_dir": 'data_preprocessed_c2c',
     # load: load saved checkpoint/model? (True to load from save: <save_dir>/<data>-model.pt)
     "load": False,
     # save_dir: model location (<save_dir>/<data>-model.pt)
@@ -77,7 +77,7 @@ torch.backends.cudnn.deterministic = True
 
 #load counts of each token in dataset
 
-with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2s', 'rb') as file:
+with open(f'{DATA_DIR}/{DATASET}/{DATASET}.dict.c2c', 'rb') as file:
     word2count = pickle.load(file)
     node2count = pickle.load(file)
     target2count = pickle.load(file)
@@ -514,7 +514,7 @@ with experiment.train():
             f.write(log+'\n')
         print(log)
 
-        train_loss, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2s', optimizer, criterion)
+        train_loss, train_p, train_r, train_f1 = train(model, f'{DATA_DIR}/{DATASET}/{DATASET}.train.c2c', optimizer, criterion)
         experiment.log_metric("loss", train_loss, step=epoch)
         experiment.log_metric("precision", train_p, step=epoch)
         experiment.log_metric("recall", train_r, step=epoch)
@@ -525,20 +525,19 @@ with experiment.train():
             f.write(log+'\n')
         print(log)
 
-        valid_loss, valid_p_1, valid_r_1, valid_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 1)
+        valid_loss, valid_p_1, valid_r_1, valid_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2c', criterion, 1)
         experiment.log_metric("validation_loss", valid_loss, step=epoch)
         experiment.log_metric("validation_p_at1", valid_p_1, step=epoch)
         experiment.log_metric("validation_r_at1", valid_r_1, step=epoch)
         experiment.log_metric("validation_f1_at1", valid_f1_1, step=epoch)
 
-        valid_loss, valid_p_3, valid_r_3, valid_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 3)
+        valid_loss, valid_p_3, valid_r_3, valid_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2c', criterion, 3)
         experiment.log_metric("validation_loss", valid_loss, step=epoch)
-        #experiment.log_metric("validation_acc", valid_acc, step=epoch)
         experiment.log_metric("validation_p_at3", valid_p_3, step=epoch)
         experiment.log_metric("validation_r_at3", valid_r_3, step=epoch)
         experiment.log_metric("validation_f1_at3", valid_f1_3, step=epoch)
 
-        valid_loss, valid_p_5, valid_r_5, valid_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2s', criterion, 5)
+        valid_loss, valid_p_5, valid_r_5, valid_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.val.c2c', criterion, 5)
         experiment.log_metric("validation_loss", valid_loss, step=epoch)
         experiment.log_metric("validation_p_at5", valid_p_5, step=epoch)
         experiment.log_metric("validation_r_at5", valid_r_5, step=epoch)
@@ -565,19 +564,19 @@ with experiment.test():
 
     model.load_state_dict(torch.load(MODEL_SAVE_PATH))
 
-    test_loss, test_p_1, test_r_1, test_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 1)
+    test_loss, test_p_1, test_r_1, test_f1_1 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2c', criterion, 1)
     experiment.log_metric("loss", test_loss, step=N_EPOCHS)
     experiment.log_metric("precision_at1", test_p_1, step=N_EPOCHS)
     experiment.log_metric("recall_at1", test_r_1, step=N_EPOCHS)
     experiment.log_metric("f1_at1", test_f1_1, step=N_EPOCHS)
 
-    test_loss, test_p_3, test_r_3, test_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 3)
+    test_loss, test_p_3, test_r_3, test_f1_3 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2c', criterion, 3)
     experiment.log_metric("loss", test_loss, step=N_EPOCHS)
     experiment.log_metric("precision_at3", test_p_3, step=N_EPOCHS)
     experiment.log_metric("recall_at3", test_r_3, step=N_EPOCHS)
     experiment.log_metric("f1_at3", test_f1_3, step=N_EPOCHS)
 
-    test_loss, test_p_5, test_r_5, test_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2s', criterion, 5)
+    test_loss, test_p_5, test_r_5, test_f1_5 = evaluate(model, f'{DATA_DIR}/{DATASET}/{DATASET}.test.c2c', criterion, 5)
     experiment.log_metric("loss", test_loss, step=N_EPOCHS)
     experiment.log_metric("precision_at5", test_p_5, step=N_EPOCHS)
     experiment.log_metric("recall_at5", test_r_5, step=N_EPOCHS)

@@ -10,7 +10,7 @@ pads methods with less paths with spaces, and creates a dictionary.
 
 
 def save_dictionaries(dataset_name, token_to_count, node_to_count, target_to_count, num_examples):
-    save_dict_file_path = '{}.dict.c2s'.format(dataset_name)
+    save_dict_file_path = '{}.dict.c2c'.format(dataset_name)
     with open(save_dict_file_path, 'wb') as file:
         pickle.dump(token_to_count, file)
         pickle.dump(node_to_count, file)
@@ -30,7 +30,7 @@ def process_file(file_path, data_file_role, dataset_name, max_contexts):
     total = 0
     max_unfiltered = 0
     max_contexts_to_sample = max_contexts
-    output_path = '{}.{}.c2s'.format(dataset_name, data_file_role)
+    output_path = '{}.{}.c2c'.format(dataset_name, data_file_role)
     with open(output_path, 'w') as outfile:
         with open(file_path, 'r') as file:
             for line in file:
