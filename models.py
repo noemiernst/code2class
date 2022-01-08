@@ -38,9 +38,8 @@ class Code2Vec(nn.Module):
         hidden_a = torch.randn(self.seq_len, self.batch_size*self.nb_paths, self.hidden_dim)
         hidden_b = torch.randn(self.seq_len, self.batch_size*self.nb_paths, self.hidden_dim)
 
-        #if self.hparams.on_gpu:
-        #    hidden_a = hidden_a.cuda()
-        #    hidden_b = hidden_b.cuda()
+        hidden_a = hidden_a.cuda()
+        hidden_b = hidden_b.cuda()
 
         hidden_a = Variable(hidden_a)
         hidden_b = Variable(hidden_b)
