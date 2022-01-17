@@ -1,10 +1,12 @@
 # PyTorch code2class
 
-This repo contains an pytorch implementation of a network combination of
+This repository contains an pytorch implementation of a network combination of
 [code2vec: Learning Distributed Representations of Code](https://arxiv.org/abs/1803.09473)
 and [code2seq: Generating Sequences from Structured Representations of Code](https://openreview.net/pdf?id=H1gKYo09tX).
 
-It uses an LSTM path encoding from code2seq and softmax label classification.
+The implementation is based on the pytorch code2vec implementation (https://github.com/bentrevett/code2vec) by [bentrevett](https://github.com/bentrevett).
+
+It uses an added LSTM path encoding from code2seq and softmax label classification.
 
 <center style="padding: 40px"><img width="70%" src="c2c_network.png" /></center>
 
