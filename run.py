@@ -21,8 +21,8 @@ hyper_params = {
     # <data_dir>/<data>/<data>.test.c2c
     # <data_dir>/<data>/<data>.val.c2c
     # <data_dir>/<data>/<data>.dict.c2c
-    "dataset_name": 'mixed_slt_opt_multiclass',
-    "data_dir": 'data_preprocessed_c2c',
+    "dataset_name": 'java-small',
+    "data_dir": 'data_preprocessed',
     # load: load saved checkpoint/model? (True to load from save: <save_dir>/<data>-model.pt)
     "load": False,
     # save_dir: model location (<save_dir>/<data>-model.pt)
@@ -32,7 +32,7 @@ hyper_params = {
     # embedding dim: size of fully connected layer (vector compression)
     "embedding_dim": 128,
     # lstm dim: hidden dim of lstm
-    "lstm_dim": 16,
+    "lstm_dim": 128,
     # dropout: dropout rate for prevention of coadaption of neurons
     "dropout": 0.25,
     # batch_size, chunks: training/evaluation uses batch_size*chunks examples at a time
@@ -41,9 +41,9 @@ hyper_params = {
     # max_length: max number of paths in examples
     "max_length": 200,
     # max_path_length: max path segments in paths
-    "max_path_length": 10,
+    "max_path_length": 8,
     # n_epochs: number of epochs to train
-    "n_epochs": 15,
+    "n_epochs": 20,
 }
 experiment.log_parameters(hyper_params)
 
